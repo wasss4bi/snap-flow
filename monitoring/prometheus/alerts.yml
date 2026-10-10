@@ -1,0 +1,57 @@
+groups:
+  - name: snapflow-critical
+    rules:
+      - alert: MetricsTargetDown
+        expr: up{job=~"snapflow|rabbitmq|rabbitmq-queues|node|dependency-tcp"} == 0
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: "Metrics target {{ $labels.job }} / {{ $labels.instance }} is unavailable"
+      - alert: DependencyUnavailable
+        expr: probe_success{job="dependency-tcp"} == 0
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: "TCP dependency {{ $labels.instance }} is unavailable"
+      - alert: ApplicationErrors
+        expr: sum by (instance) (increase(snapflow_errors_total{severity=~"ERROR|FATAL"}[5m])) > 0
+        for: 0m
+        labels: {severity: critical}
+        annotations:
+          summary: "Application error events observed on {{ $labels.instance }}"
+      - alert: HighHTTPErrorRate
+        expr: (sum(rate(snapflow_http_request_duration_seconds_count{status=~"5.."}[5m])) / sum(rate(snapflow_http_request_duration_seconds_count[5m])) > 0.05) and (sum(rate(snapflow_http_request_duration_seconds_count[5m])) > 0.1)
+        for: 5m
+        labels: {severity: critical}
+        annotations:
+          summary: "HTTP 5xx rate is above 5 percent"
+      - alert: QueueBacklog
+        expr: rabbitmq_detailed_queue_messages{queue=~".*(tasks|parking|retry(\\.[0-9]+)?)"} > 100
+        for: 5m
+        labels: {severity: critical}
+        annotations:
+          summary: "RabbitMQ queue {{ $labels.queue }} has more than 100 messages"
+      - alert: ParkingQueueNotEmpty
+        expr: rabbitmq_detailed_queue_messages{queue=~".*\\.parking"} > 0
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: "RabbitMQ parking queue {{ $labels.queue }} contains failed tasks"
+      - alert: FailedUploadRecoveryDelayed
+        expr: snapflow_oldest_failed_upload_seconds > 86400
+        for: 5m
+        labels: {severity: critical}
+        annotations:
+          summary: "A failed upload has awaited recovery for more than 24 hours"
+      - alert: DiskSpaceLow
+        expr: node_filesystem_avail_bytes{mountpoint=~"/|/var/lib",fstype=~"ext4|xfs|btrfs"} / node_filesystem_size_bytes{mountpoint=~"/|/var/lib",fstype=~"ext4|xfs|btrfs"} < 0.1
+        for: 5m
+        labels: {severity: critical}
+        annotations:
+          summary: "Filesystem {{ $labels.mountpoint }} free space is below 10 percent"
+      - alert: HighCPU
+        expr: 100 * (1 - avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m]))) > 90
+        for: 10m
+        labels: {severity: critical}
+        annotations:
+          summary: "CPU usage is above 90 percent"

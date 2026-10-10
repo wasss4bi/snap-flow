@@ -1,0 +1,6 @@
+extends:
+  - minimal
+rules:
+  info-license: off
+  info-contact: off
+  no-server-example.com: off

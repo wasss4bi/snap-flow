@@ -1,0 +1,2 @@
+CREATE TABLE IF NOT EXISTS confirmation_mails (id varchar(36) PRIMARY KEY, user_id bigint NOT NULL, email text NOT NULL, code_hash text NOT NULL, ciphertext bytea NOT NULL, expires_at timestamptz NOT NULL, available_at timestamptz NOT NULL, attempts bigint NOT NULL DEFAULT 0, sent_at timestamptz, cancelled_at timestamptz, created_at timestamptz NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_confirmation_mails_pending ON confirmation_mails(available_at) WHERE sent_at IS NULL AND cancelled_at IS NULL;

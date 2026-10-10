@@ -1,0 +1,19 @@
+meta {
+  name: JWT authorizes API
+  type: http
+  seq: 20
+}
+
+get {
+  url: {{baseUrl}}/api/get-images-count
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{jwt}}
+}
+
+tests {
+  test("HTTP 200", function () { expect(res.getStatus()).to.equal(200); });
+}

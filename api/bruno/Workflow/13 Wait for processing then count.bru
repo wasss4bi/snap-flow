@@ -1,0 +1,35 @@
+meta {
+  name: Wait for processing then count
+  type: http
+  seq: 14
+}
+
+get {
+  url: {{baseUrl}}/api/get-images-count
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{jwt}}
+}
+
+script:pre-request {
+  const files=bru.getVar('filenames')||[];
+  if(files.length!==3) throw new Error('Run Queue three images first');
+  const deadline=Date.now()+45000;
+  for(const filename of files){
+    let ready=false;
+    while(Date.now()<deadline){
+      try { const result=await bru.sendRequest({method:'GET',url:bru.getEnvVar('baseUrl')+'/images/'+filename,headers:{Authorization:'Bearer '+bru.getVar('jwt')},timeout:2000}); if(result.status===200){ready=true;break;} } catch(error) {}
+      await bru.sleep(200);
+    }
+    if(!ready) throw new Error('Image was not ready within the shared 45s deadline');
+  }
+}
+
+tests {
+  test("HTTP 200", function () { expect(res.getStatus()).to.equal(200); });
+  test("success", function () { expect(res.getBody().success).to.equal(true); });
+  test("three processed metadata rows",function(){expect(res.getBody().images_count).to.equal(3);});
+}

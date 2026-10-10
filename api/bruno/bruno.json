@@ -1,0 +1,10 @@
+{
+  "version": "1",
+  "name": "SnapFlow Go local API",
+  "type": "collection",
+  "ignore": [
+    "node_modules",
+    ".git",
+    "fixtures"
+  ]
+}

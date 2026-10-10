@@ -1,0 +1,19 @@
+meta {
+  name: Invalid image ID
+  type: http
+  seq: 22
+}
+
+delete {
+  url: {{baseUrl}}/api/delete-image/-1
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{jwt}}
+}
+
+tests {
+  test("HTTP 400", function () { expect(res.getStatus()).to.equal(400); });
+}

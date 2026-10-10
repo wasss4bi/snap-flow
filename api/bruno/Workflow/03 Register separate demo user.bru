@@ -1,0 +1,48 @@
+meta {
+  name: Register separate demo user
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/register
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "name": "Bruno registration",
+    "invite_code": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "email": "{{registrationEmail}}",
+    "password": "{{password}}"
+  }
+}
+
+script:pre-request {
+  bru.setVar('registrationEmail', 'bruno-register-'+Date.now()+'@example.test');
+}
+
+script:post-response {
+  if (res.getStatus() === 201) {
+    let search;
+    for (let i=0;i<30;i++) { search = await bru.sendRequest({method:'GET',url:bru.getEnvVar('mailpitUrl')+'/api/v1/search?query='+encodeURIComponent('to:'+bru.getVar('registrationEmail'))}); if (search.data.messages && search.data.messages.length) break; await bru.sleep(200); }
+    if (!search.data.messages || !search.data.messages.length) throw new Error('Confirmation email missing in Mailpit');
+    const message = await bru.sendRequest({method:'GET',url:bru.getEnvVar('mailpitUrl')+'/api/v1/message/'+search.data.messages[0].ID});
+    const match = message.data.Text.match(/confirmation code: ([0-9]{6})/);
+    if (!match) throw new Error('Confirmation token missing');
+    bru.setVar('verificationToken', match[1]);
+  }
+}
+tests {
+  test("HTTP 201", function () { expect(res.getStatus()).to.equal(201); });
+  test("success", function () { expect(res.getBody().success).to.equal(true); });
+}
+
+docs {
+  Creates a distinct test user. The next request confirms its email using the local Mailpit inbox.
+}

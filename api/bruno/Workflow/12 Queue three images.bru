@@ -1,0 +1,37 @@
+meta {
+  name: Queue three images
+  type: http
+  seq: 13
+}
+
+post {
+  url: {{baseUrl}}/api/upload-images
+  body: multipartForm
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{jwt}}
+  Idempotency-Key: {{$randomUUID}}
+}
+
+body:multipart-form {
+  images: @file(fixtures/sample.jpg)
+  images: @file(fixtures/sample.png)
+  images: @file(fixtures/sample.gif)
+}
+
+script:post-response {
+  if(res.getStatus()===202){const files=res.getBody().files||[];bru.setVar('filenames',files);bru.setVar('filename',files[0]);}
+}
+
+tests {
+  test("HTTP 202", function () { expect(res.getStatus()).to.equal(202); });
+  test("success", function () { expect(res.getBody().success).to.equal(true); });
+  test("three accepted names",function(){expect(res.getBody().files).to.have.lengthOf(3);});
+}
+
+docs {
+  202 confirms durable acceptance for background processing. The following bounded wait checks readable completed images.
+  Each send generates a new Idempotency-Key. To retry the same request, replace the generated value with its original key.
+}

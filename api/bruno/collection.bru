@@ -1,0 +1,14 @@
+docs {
+  Local fixtures only. Run Workflow first, then obtain the PostgreSQL image ID and run Delete.
+  JWT and apiToken are separate. Runtime JWT/filenames are never written into this environment file.
+  Disable automatic cookies for Bearer/negative cases. CLI wrapper passes --disable-cookies.
+  The explicit Cookie profile request tests cookie auth separately.
+}
+
+script:pre-request {
+  bru.setVar('requestId', 'bruno-'+Date.now()+'-'+Math.floor(Math.random()*1000000));
+  req.setHeader('X-Request-ID', bru.getVar('requestId'));
+}
+script:post-response {
+  if(res.getHeader('x-request-id') !== bru.getVar('requestId')) throw new Error('Response request_id mismatch');
+}

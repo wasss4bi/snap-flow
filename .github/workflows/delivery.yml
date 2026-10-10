@@ -1,0 +1,142 @@
+name: Test, build and deploy
+
+on:
+  pull_request:
+    branches: [stage, prod]
+  push:
+    branches: [stage, prod]
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.1.6
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check branch promotion
+        if: github.event_name == 'pull_request'
+        env:
+          HEAD_BRANCH: ${{ github.head_ref }}
+          BASE_BRANCH: ${{ github.base_ref }}
+        run: |
+          if [[ "$BASE_BRANCH" == stage && "$HEAD_BRANCH" == feature/* ]] || [[ "$BASE_BRANCH" == prod && "$HEAD_BRANCH" == stage ]]; then
+            exit 0
+          fi
+          echo 'Allowed: feature/* -> stage and stage -> prod' >&2
+          exit 1
+      - name: Prepare isolated test configuration
+        run: |
+          cp .env.example .env
+          cat >> .env <<'EOF'
+          JWT_SECRET=ci-only-jwt-secret-not-used-in-production
+          ADMIN_NAME=CI Admin
+          ADMIN_EMAIL=admin@example.test
+          ADMIN_PASSWORD=CI-only-password-123!
+          EOF
+      - name: Validate monitoring configuration
+        run: |
+          docker run --rm -v "$PWD/monitoring/prometheus:/etc/prometheus:ro" --entrypoint promtool prom/prometheus:v2.54.1 check config /etc/prometheus/prometheus.yml
+          docker run --rm -v "$PWD/monitoring/alertmanager:/etc/alertmanager:ro" --entrypoint amtool prom/alertmanager:v0.27.0 check-config /etc/alertmanager/alertmanager.yml
+      - name: Run unit and integration tests
+        run: docker compose -f compose.test.yaml --profile test run --build --rm tests
+      - name: Run end-to-end smoke tests
+        run: docker compose -f compose.test.yaml --profile test run --build --rm smoke
+      - name: Clean up test containers
+        if: always()
+        run: docker compose -f compose.test.yaml --profile test down --volumes --remove-orphans
+
+  build:
+    name: Build image
+    needs: [test, lint]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.image.outputs.name }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: image
+        shell: bash
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+      - name: Log in to GHCR
+        if: github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and publish on branch push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          target: runtime
+          push: ${{ github.event_name == 'push' }}
+          tags: ${{ steps.image.outputs.name }}
+
+  deploy:
+    name: Deploy production
+    if: github.event_name == 'push' && github.ref == 'refs/heads/prod'
+    needs: [test, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: snapflow-production
+      cancel-in-progress: false
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure SSH
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+      - name: Upload and deploy release
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_DIR: ${{ vars.DEPLOY_DIR }}
+          GHCR_USER: ${{ secrets.GHCR_READ_USER }}
+          GHCR_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
+          IMAGE: ${{ needs.build.outputs.image }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$DEPLOY_DIR" =~ ^/[a-zA-Z0-9_./-]+$ && "$DEPLOY_DIR" != *..* ]] || { echo 'Invalid DEPLOY_DIR' >&2; exit 1; }
+          [[ "$DEPLOY_USER" =~ ^[a-z_][a-z0-9_-]*$ ]] || exit 1
+          [[ "$DEPLOY_HOST" =~ ^[a-zA-Z0-9.:-]+$ ]] || exit 1
+          [[ "$GHCR_USER" =~ ^[a-zA-Z0-9-]+$ ]] || exit 1
+          target="$DEPLOY_USER@$DEPLOY_HOST"
+          release="$DEPLOY_DIR/releases/$GITHUB_SHA"
+          ssh "$target" "mkdir -p '$release/docker' && test -f '$DEPLOY_DIR/.env'"
+          scp compose.yaml "$target:$release/compose.yaml"
+          scp compose.observability.yaml compose.observability.production.yaml "$target:$release/"
+          scp -r monitoring "$target:$release/monitoring"
+          scp -r k6 "$target:$release/k6"
+          scp docker/rabbitmq.conf "$target:$release/docker/rabbitmq.conf"
+          scp docker/rabbitmq-enabled-plugins "$target:$release/docker/rabbitmq-enabled-plugins"
+          scp docker/deploy.sh "$target:$release/docker/deploy.sh"
+          printf '%s' "$GHCR_TOKEN" | ssh "$target" "docker login ghcr.io -u '$GHCR_USER' --password-stdin"
+          ssh "$target" "bash '$release/docker/deploy.sh' '$DEPLOY_DIR' '$release' '$IMAGE'" < /dev/null

@@ -1,0 +1,28 @@
+meta {
+  name: Delete one by PostgreSQL ID
+  type: http
+  seq: 2
+}
+
+delete {
+  url: {{baseUrl}}/delete-image/{{imageId}}
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{jwt}}
+}
+
+script:pre-request {
+  if(!Number(bru.getEnvVar('imageId'))) throw new Error('Set imageId from the documented local PostgreSQL query first');
+}
+
+tests {
+  test("HTTP 200", function () { expect(res.getStatus()).to.equal(200); });
+  test("success", function () { expect(res.getBody().success).to.equal(true); });
+}
+
+docs {
+  The wrapper reads the actual metadata ID and filename from the dedicated fixture account. No image ID HTTP listing endpoint is invented.
+}

@@ -1,0 +1,31 @@
+meta {
+  name: Login other user
+  type: http
+  seq: 10
+}
+
+post {
+  url: {{baseUrl}}/api/login
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "email": "{{otherEmail}}",
+    "password": "{{password}}"
+  }
+}
+
+script:post-response {
+  if(res.getStatus()===200) bru.setVar('otherJwt',res.getBody().token);
+}
+
+tests {
+  test("HTTP 200", function () { expect(res.getStatus()).to.equal(200); });
+  test("success", function () { expect(res.getBody().success).to.equal(true); });
+}

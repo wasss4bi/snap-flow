@@ -1,0 +1,24 @@
+meta {
+  name: JWT remains valid after logout
+  type: http
+  seq: 25
+}
+
+get {
+  url: {{baseUrl}}/profile
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{jwt}}
+}
+
+tests {
+  test("HTTP 200", function () { expect(res.getStatus()).to.equal(200); });
+  test("success", function () { expect(res.getBody().success).to.equal(true); });
+}
+
+docs {
+  Logout clears a cookie; there is no JWT revocation mechanism.
+}

@@ -1,0 +1,16 @@
+meta {
+  name: Process status
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/
+  body: none
+  auth: none
+}
+
+tests {
+  test("HTTP 200", function () { expect(res.getStatus()).to.equal(200); });
+  test("liveness only", function(){ expect(res.getBody().status).to.equal('running'); });
+}
