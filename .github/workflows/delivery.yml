@@ -116,5 +116,6 @@ jobs:
           ssh "$target" "mkdir -p '$release/docker' && test -f '$DEPLOY_DIR/.env'"
           scp compose.yaml "$target:$release/compose.yaml"
           scp docker/rabbitmq.conf "$target:$release/docker/rabbitmq.conf"
+          scp docker/deploy.sh "$target:$release/docker/deploy.sh"
           printf '%s' "$GHCR_TOKEN" | ssh "$target" "docker login ghcr.io -u '$GHCR_USER' --password-stdin"
-          ssh "$target" "bash -s -- '$DEPLOY_DIR' '$release' '$IMAGE'" < docker/deploy.sh
+          ssh "$target" "bash '$release/docker/deploy.sh' '$DEPLOY_DIR' '$release' '$IMAGE'" < /dev/null

@@ -11,7 +11,7 @@ compose=(docker compose --env-file "$deploy_dir/.env" -f "$release/compose.yaml"
 "${compose[@]}" config -q
 "${compose[@]}" pull
 "${compose[@]}" up -d --wait postgres rabbitmq redis
-"${compose[@]}" run --rm --no-deps migrate
+"${compose[@]}" run --rm --no-deps -T --interactive=false migrate
 "${compose[@]}" up -d --no-deps --wait --wait-timeout 180 server worker outbox
 printf '%s\n' "$APP_IMAGE" > "$deploy_dir/current-image"
 printf '%s\n' "$release" > "$deploy_dir/current-release"
