@@ -1,0 +1,19 @@
+meta {
+  name: Deleted original unavailable
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/images/{{filename}}
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{jwt}}
+}
+
+tests {
+  test("HTTP 404", function () { expect(res.getStatus()).to.equal(404); });
+}

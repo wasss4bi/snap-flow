@@ -1,0 +1,19 @@
+meta {
+  name: Web delete all is now empty
+  type: http
+  seq: 7
+}
+
+delete {
+  url: {{baseUrl}}/delete-images
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{jwt}}
+}
+
+tests {
+  test("HTTP 404", function () { expect(res.getStatus()).to.equal(404); });
+}

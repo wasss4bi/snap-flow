@@ -1,0 +1,23 @@
+meta {
+  name: Clean previous demo images
+  type: http
+  seq: 11
+}
+
+delete {
+  url: {{baseUrl}}/api/delete-images
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{jwt}}
+}
+
+tests {
+  test("empty or cleanup queued",function(){expect([200,404]).to.include(res.getStatus());});
+}
+
+docs {
+  Deletes only images of the dedicated fixture owner. Physical cleanup is asynchronous.
+}

@@ -1,0 +1,19 @@
+meta {
+  name: Other owner cannot read
+  type: http
+  seq: 17
+}
+
+get {
+  url: {{baseUrl}}/images/{{filename}}
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{otherJwt}}
+}
+
+tests {
+  test("HTTP 404", function () { expect(res.getStatus()).to.equal(404); });
+}

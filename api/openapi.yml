@@ -1,0 +1,1469 @@
+components:
+    responses:
+        ApiCountUnauthorized:
+            content:
+                application/json:
+                    schema:
+                        oneOf:
+                            - $ref: '#/components/schemas/JwtError'
+                            - $ref: '#/components/schemas/CountError'
+            description: JWT middleware returns an error; the count handler can also return success and error.
+        ApiUnauthorized:
+            content:
+                application/json:
+                    schema:
+                        oneOf:
+                            - $ref: '#/components/schemas/JwtError'
+                            - $ref: '#/components/schemas/MessageError'
+            description: Missing, invalid or expired JWT, or account unavailable.
+        JwtDeleteUnauthorized:
+            content:
+                application/json:
+                    schema:
+                        oneOf:
+                            - $ref: '#/components/schemas/JwtError'
+                            - $ref: '#/components/schemas/MessageError'
+            description: JWT middleware {error}, or handler {success:false,message} if user cannot be loaded
+        JwtUnauthorized:
+            content:
+                application/json:
+                    schema:
+                        $ref: '#/components/schemas/JwtError'
+            description: JWT missing, malformed or expired. Usually JSON {error}; image handlers may return an empty 401 if the claim user cannot be loaded.
+    schemas:
+        CountError:
+            properties:
+                error:
+                    type: string
+                success:
+                    const: false
+            required:
+                - success
+                - error
+            type: object
+        CountResponse:
+            examples:
+                - images_count: 3
+                  success: true
+                - success: true
+            properties:
+                images_count:
+                    description: Omitted when the count is zero (Go omitempty).
+                    minimum: 1
+                    type: integer
+                success:
+                    const: true
+            required:
+                - success
+            type: object
+        DeleteResponse:
+            properties:
+                message:
+                    type: string
+                success:
+                    type: boolean
+            required:
+                - success
+                - message
+            type: object
+        JwtError:
+            properties:
+                error:
+                    examples:
+                        - Authorization header required
+                        - Invalid authorization header format
+                        - Invalid token
+                        - Admin access required
+                    type: string
+            required:
+                - error
+            type: object
+        LoginRequest:
+            example:
+                email: bruno-owner@example.test
+                password: bruno-local-password
+            properties:
+                email:
+                    format: email
+                    type: string
+                password:
+                    minLength: 1
+                    type: string
+            required:
+                - email
+                - password
+            type: object
+        LoginResponse:
+            properties:
+                attempts_remaining:
+                    maximum: 5
+                    minimum: 0
+                    type: integer
+                message:
+                    type: string
+                success:
+                    const: true
+                token:
+                    description: JWT for authenticated routes.
+                    type: string
+            required:
+                - success
+                - token
+                - message
+            type: object
+        Message:
+            properties:
+                message:
+                    type: string
+            required:
+                - message
+            type: object
+        MessageError:
+            properties:
+                message:
+                    type: string
+                success:
+                    const: false
+            required:
+                - success
+                - message
+            type: object
+        ProfileResponse:
+            properties:
+                storage_limits:
+                    properties:
+                        access_to:
+                            format: date-time
+                            type: string
+                        memory_limit:
+                            type: integer
+                        used_bytes:
+                            type: integer
+                        user_id:
+                            type: integer
+                    type:
+                        - object
+                        - "null"
+                success:
+                    const: true
+                user:
+                    properties:
+                        email:
+                            format: email
+                            type: string
+                        id:
+                            minimum: 1
+                            type: integer
+                        is_admin:
+                            type: boolean
+                        name:
+                            type: string
+                    required:
+                        - id
+                        - name
+                        - email
+                        - is_admin
+                    type: object
+            required:
+                - success
+                - user
+            type: object
+        RegisterRequest:
+            properties:
+                email:
+                    format: email
+                    type: string
+                invite_code:
+                    type: string
+                name:
+                    description: At least three characters; whitespace and control characters are forbidden.
+                    minLength: 3
+                    type: string
+                password:
+                    description: At most 72 bytes; requires uppercase and lowercase letters, a digit and a punctuation mark or symbol. Whitespace and control characters are forbidden.
+                    minLength: 8
+                    type: string
+            required:
+                - name
+                - email
+                - password
+                - invite_code
+            type: object
+        Status:
+            properties:
+                message:
+                    const: Snap Flow API Server
+                status:
+                    const: running
+                version:
+                    const: 1.0.0
+            required:
+                - message
+                - version
+                - status
+            type: object
+        UploadResponse:
+            examples:
+                - files:
+                    - 00000000-0000-4000-8000-000000000001.jpg
+                  message: Successfully accepted 1 images for processing
+                  success: true
+                - message: No valid images accepted
+                  success: false
+                - message: Failed to persist images
+                  success: false
+            properties:
+                files:
+                    description: Accepted filenames only, omitted when empty. These are not database IDs.
+                    items:
+                        type: string
+                    minItems: 1
+                    type: array
+                message:
+                    type: string
+                success:
+                    type: boolean
+                uploads:
+                    items:
+                        properties:
+                            id:
+                                type: string
+                            original_name:
+                                type: string
+                            reason:
+                                type: string
+                            status:
+                                enum:
+                                    - processing
+                                    - rejected
+                                type: string
+                        type: object
+                    type: array
+            required:
+                - success
+                - message
+            type: object
+        ValidationError:
+            properties:
+                error:
+                    description: Current Gin validator/binding error text; not a stable error code.
+                    type: string
+                message:
+                    const: Invalid request data
+                success:
+                    const: false
+            required:
+                - success
+                - message
+                - error
+            type: object
+    securitySchemes:
+        JwtBearer:
+            bearerFormat: JWT
+            description: JWT returned by registration/login. Ignored if auth_token cookie is present.
+            scheme: bearer
+            type: http
+        JwtCookie:
+            description: JWT cookie set by login; takes precedence over Bearer header.
+            in: cookie
+            name: auth_token
+            type: apiKey
+info:
+    description: Invite-only photo storage API. Login uses a JWT. Uploads are limited by access expiry and original file size. Expired access triggers notification and deletion after 15 days unless extended.
+    title: SnapFlow Go API
+    version: 1.0.0
+openapi: 3.1.2
+paths:
+    /:
+        get:
+            description: Returns fixed process information, not a full PostgreSQL/RabbitMQ readiness probe.
+            operationId: status
+            parameters:
+                - description: Optional 1–64 ASCII letters, digits, underscore or dash. Invalid/missing values are replaced by a UUID, not rejected.
+                  in: header
+                  name: X-Request-ID
+                  required: false
+                  schema:
+                    maxLength: 64
+                    type: string
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+                    description: Process is responding
+                    headers:
+                        X-Request-ID:
+                            description: Accepted or generated correlation identifier
+                            schema:
+                                type: string
+            security: []
+            summary: Process liveness information
+            tags:
+                - Service
+    /admin/invites:
+        post:
+            description: Returns the invitation secret once. Used invitations are retained; expired unused invitations are removed.
+            operationId: createInvite
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            properties:
+                                access_to:
+                                    format: date-time
+                                    type: string
+                                memory_limit:
+                                    format: int64
+                                    minimum: 1
+                                    type: integer
+                            required:
+                                - access_to
+                                - memory_limit
+                            type: object
+                required: true
+            responses:
+                "200":
+                    description: Success
+                "201":
+                    description: Invitation created
+                "400":
+                    description: Invalid request
+                "401":
+                    description: Unauthenticated
+                "403":
+                    description: Administrator required
+                "500":
+                    description: Server error
+            security:
+                - JwtBearer: []
+                - JwtCookie: []
+            summary: Create a 24-hour invitation
+            tags:
+                - Administration
+    /admin/users:
+        get:
+            operationId: listUsers
+            responses:
+                "200":
+                    description: Success
+                "400":
+                    description: Invalid request
+                "401":
+                    description: Unauthenticated
+                "403":
+                    description: Administrator required
+                "500":
+                    description: Server error
+            security:
+                - JwtBearer: []
+                - JwtCookie: []
+            summary: List users and current storage limits
+            tags:
+                - Administration
+    /admin/users/{id}/limits:
+        put:
+            operationId: updateUserLimits
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  schema:
+                    type: integer
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            properties:
+                                access_to:
+                                    format: date-time
+                                    type: string
+                                memory_limit:
+                                    format: int64
+                                    minimum: 1
+                                    type: integer
+                            required:
+                                - access_to
+                                - memory_limit
+                            type: object
+                required: true
+            responses:
+                "200":
+                    description: Success
+                "400":
+                    description: Invalid request
+                "401":
+                    description: Unauthenticated
+                "403":
+                    description: Administrator required
+                "404":
+                    description: User not found
+                "500":
+                    description: Server error
+            security:
+                - JwtBearer: []
+                - JwtCookie: []
+            summary: Update access deadline and storage limit
+            tags:
+                - Administration
+    /api/delete-image/{id}:
+        delete:
+            description: Queues durable physical deletion and hides metadata. Quota is released only after the original, thumbnail and staging objects have been deleted. Deletion retries indefinitely after storage errors.
+            operationId: deleteImageApi
+            parameters:
+                - description: Image metadata ID in PostgreSQL, not a filename. No HTTP listing/ID lookup is implemented; use the documented local fixture/database query for tests.
+                  in: path
+                  name: id
+                  required: true
+                  schema:
+                    maximum: 4.294967295e+09
+                    minimum: 0
+                    type: integer
+                - description: Optional 1–64 ASCII letters, digits, underscore or dash. Invalid/missing values are replaced by a UUID, not rejected.
+                  in: header
+                  name: X-Request-ID
+                  required: false
+                  schema:
+                    maxLength: 64
+                    type: string
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/DeleteResponse'
+                    description: Deletion scheduled
+                    headers:
+                        X-Request-ID:
+                            description: Accepted or generated correlation identifier
+                            schema:
+                                type: string
+                "400":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/DeleteResponse'
+                    description: Invalid uint32 image ID
+                    headers:
+                        X-Request-ID:
+                            description: Accepted or generated correlation identifier
+                            schema:
+                                type: string
+                "401":
+                    $ref: '#/components/responses/ApiUnauthorized'
+                "403":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/MessageError'
+                    description: Email confirmation required
+                "404":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/DeleteResponse'
+                    description: No visible owned image, or lookup failed
+                    headers:
+                        X-Request-ID:
+                            description: Accepted or generated correlation identifier
+                            schema:
+                                type: string
+                "500":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/DeleteResponse'
+                    description: Metadata deletion failed
+                    headers:
+                        X-Request-ID:
+                            description: Accepted or generated correlation identifier
+                            schema:
+                                type: string
+            security:
+                - JwtBearer: []
+                - JwtCookie: []
+            summary: Delete one owned image asynchronously
+            tags:
+                - Images
+    /api/delete-images:
+        delete:
+            description: Queues durable physical deletion and hides metadata. Quota is released only after the original, thumbnail and staging objects have been deleted. Deletion retries indefinitely after storage errors.
+            operationId: deleteAllImagesApi
+            parameters:
+                - description: Optional 1–64 ASCII letters, digits, underscore or dash. Invalid/missing values are replaced by a UUID, not rejected.
+                  in: header
+                  name: X-Request-ID
+                  required: false
+                  schema:
+                    maxLength: 64
+                    type: string
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/DeleteResponse'
+                    description: Deletion scheduled
+                    headers:
+                        X-Request-ID:
+                            description: Accepted or generated correlation identifier
+                            schema:
+                                type: string
+                "401":
+                    $ref: '#/components/responses/ApiUnauthorized'
+                "403":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/MessageError'
+                    description: Email confirmation required
+                "404":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/DeleteResponse'
+                    description: No visible images
+                    headers:
+                        X-Request-ID:
+                            description: Accepted or generated correlation identifier
+                            schema:
+                                type: string
+                "500":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/DeleteResponse'
+                    description: Image lookup/deletion failed
+                    headers:
+                        X-Request-ID:
+                            description: Accepted or generated correlation identifier
+                            schema:
+                                type: string
+            security:
+                - JwtBearer: []
+                - JwtCookie: []
+            summary: Delete all images of the current user
+            tags:
+                - Images
+    /api/get-images-count:
+        get:
+            description: Counts processed, non-deleted metadata only. Zero is represented as {"success":true}, with images_count omitted. It does not list IDs or filenames.
+            operationId: imageCount
+            parameters:
+                - description: Optional 1–64 ASCII letters, digits, underscore or dash. Invalid/missing values are replaced by a UUID, not rejected.
+                  in: header
+                  name: X-Request-ID
+                  required: false
+                  schema:
+                    maxLength: 64
+                    type: string
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/CountResponse'
+                    description: Count of visible processed images
+                    headers:
+                        X-Request-ID:
+                            description: Accepted or generated correlation identifier
+                            schema:
+                                type: string
+                "401":
+                    $ref: '#/components/responses/ApiCountUnauthorized'
+                "403":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/MessageError'
+                    description: Email confirmation required
+                "500":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/CountError'
+                    description: Count query failed
+                    headers:
+                        X-Request-ID:
+                            description: Accepted or generated correlation identifier
+                            schema:
+                                type: string
+            security:
+                - JwtBearer: []
+                - JwtCookie: []
+            summary: Count visible image metadata
+            tags:
+                - Images
+    /api/images:
+        get:
+            operationId: listImages
+            parameters:
+                - in: query
+                  name: page
+                  schema:
+                    default: 1
+                    minimum: 1
+                    type: integer
+                - in: query
+                  name: limit
+                  schema:
+                    default: 20
+                    maximum: 100
+                    minimum: 1
+                    type: integer
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                properties:
+                                    images:
+                                        items:
+                                            properties:
+                                                created_at:
+                                                    format: date-time
+                                                    type: string
+                                                filename:
+                                                    type: string
+                                                id:
+                                                    type: integer
+                                                size_bytes:
+                                                    format: int64
+                                                    type: integer
+                                            required:
+                                                - id
+                                                - filename
+                                                - size_bytes
+                                                - created_at
+                                            type: object
+                                        type: array
+                                    limit:
+                                        type: integer
+                                    page:
+                                        type: integer
+                                    total:
+                                        type: integer
+                                type: object
+                    description: Owner photographs
+                "400":
+                    description: Invalid pagination
+                "401":
+                    description: Unauthenticated
+            security:
+                - JwtBearer: []
+                - JwtCookie: []
+            summary: List successfully processed photographs
+            tags:
+                - Images
+    /api/login:
+        post:
+            description: Five failed attempts per IP in a rolling ten-minute window. Successful authentication clears failures. A blocked or concurrently saturated IP receives 429.
+            operationId: login
+            parameters:
+                - description: Optional 1–64 ASCII letters, digits, underscore or dash. Invalid/missing values are replaced by a UUID, not rejected.
+                  in: header
+                  name: X-Request-ID
+                  required: false
+                  schema:
+                    maxLength: 64
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/LoginRequest'
+                required: true
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/LoginResponse'
+                    description: Signed in
+                    headers:
+                        Set-Cookie:
+                            description: auth_token=<JWT>; Path=/; Max-Age=86400; HttpOnly
+                            schema:
+                                type: string
+                        X-Request-ID:
+                            description: Accepted or generated correlation identifier
+                            schema:
+                                type: string
+                "400":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ValidationError'
+                    description: JSON binding/validation failed
+                    headers:
+                        X-Request-ID:
+                            description: Accepted or generated correlation identifier
+                            schema:
+                                type: string
+                "401":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/MessageError'
+                    description: Invalid email or password, including a failed user lookup
+                    headers:
+                        X-Request-ID:
+                            description: Accepted or generated correlation identifier
+                            schema:
+                                type: string
+                "403":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/MessageError'
+                    description: Email confirmation required
+                "429":
+                    description: Too many attempts
+                    headers:
+                        Retry-After:
+                            description: Seconds until retry
+                            schema:
+                                type: integer
+                "500":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/MessageError'
+                    description: JWT generation failed
+                    headers:
+                        X-Request-ID:
+                            description: Accepted or generated correlation identifier
+                            schema:
+                                type: string
+                "503":
+                    description: Rate limiter unavailable
+            security: []
+            summary: Sign in with email and password
+            tags:
+                - Authentication
+    /api/register:
+        post:
+            description: Creates an unverified account and records a confirmation email for asynchronous delivery.
+            operationId: register
+            parameters:
+                - description: Optional 1–64 ASCII letters, digits, underscore or dash. Invalid/missing values are replaced by a UUID, not rejected.
+                  in: header
+                  name: X-Request-ID
+                  required: false
+                  schema:
+                    maxLength: 64
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/RegisterRequest'
+                required: true
+            responses:
+                "201":
+                    content:
+                        application/json:
+                            schema:
+                                properties:
+                                    message:
+                                        type: string
+                                    success:
+                                        const: true
+                                required:
+                                    - success
+                                    - message
+                                type: object
+                    description: Account created; check email
+                "400":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/MessageError'
+                    description: Invalid request data
+                "409":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/MessageError'
+                    description: Email already exists
+                    headers:
+                        X-Request-ID:
+                            description: Accepted or generated correlation identifier
+                            schema:
+                                type: string
+                "500":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/MessageError'
+                    description: Database or registration failure
+                    headers:
+                        X-Request-ID:
+                            description: Accepted or generated correlation identifier
+                            schema:
+                                type: string
+            security: []
+            summary: Register and request email confirmation
+            tags:
+                - Authentication
+    /api/resend-verification:
+        post:
+            description: Returns the same response for unknown or already confirmed accounts. At most one new code per account per minute. A new code invalidates the previous one.
+            operationId: resendVerification
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            properties:
+                                email:
+                                    format: email
+                                    type: string
+                            required:
+                                - email
+                            type: object
+                required: true
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                properties:
+                                    message:
+                                        type: string
+                                    success:
+                                        const: true
+                                required:
+                                    - success
+                                    - message
+                                type: object
+                    description: Operation completed
+                "400":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/MessageError'
+                    description: Invalid email
+            security: []
+            summary: Request another confirmation email
+            tags:
+                - Authentication
+    /api/upload-images:
+        post:
+            description: Accepted files return status processing and an id. Poll /api/uploads/{filename}. Rejected files include a reason. Maximum 32 images and 10 MiB per file.
+            operationId: uploadImages
+            parameters:
+                - description: Optional 1–64 ASCII letters, digits, underscore or dash. Invalid/missing values are replaced by a UUID, not rejected.
+                  in: header
+                  name: X-Request-ID
+                  required: false
+                  schema:
+                    maxLength: 64
+                    type: string
+            requestBody:
+                content:
+                    multipart/form-data:
+                        encoding:
+                            images:
+                                contentType: image/jpeg, image/png, image/gif
+                        schema:
+                            properties:
+                                images:
+                                    items:
+                                        format: binary
+                                        type: string
+                                    maxItems: 32
+                                    minItems: 1
+                                    type: array
+                            required:
+                                - images
+                            type: object
+                required: true
+            responses:
+                "202":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/UploadResponse'
+                    description: Files accepted for asynchronous processing
+                    headers:
+                        X-Request-ID:
+                            description: Accepted or generated correlation identifier
+                            schema:
+                                type: string
+                "400":
+                    content:
+                        application/json:
+                            schema:
+                                oneOf:
+                                    - $ref: '#/components/schemas/MessageError'
+                                    - $ref: '#/components/schemas/UploadResponse'
+                    description: Malformed multipart, no images, or no valid files accepted
+                    headers:
+                        X-Request-ID:
+                            description: Accepted or generated correlation identifier
+                            schema:
+                                type: string
+                "401":
+                    $ref: '#/components/responses/ApiUnauthorized'
+                "403":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/UploadResponse'
+                    description: Access expired or storage quota exceeded
+                "503":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/UploadResponse'
+                    description: No operation could be confirmed durably accepted due to storage/database failure.
+                    headers:
+                        X-Request-ID:
+                            description: Accepted or generated correlation identifier
+                            schema:
+                                type: string
+            security:
+                - JwtBearer: []
+                - JwtCookie: []
+            summary: Queue one or more images for asynchronous processing
+            tags:
+                - Images
+    /api/uploads/{filename}:
+        get:
+            description: Failed statuses are kept for at least 30 days and until cleanup completes.
+            operationId: uploadStatus
+            parameters:
+                - in: path
+                  name: filename
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                properties:
+                                    created_at:
+                                        format: date-time
+                                        type: string
+                                    id:
+                                        type: string
+                                    reason:
+                                        type: string
+                                    status:
+                                        enum:
+                                            - processing
+                                            - ready
+                                            - failed
+                                            - deleting
+                                            - deleted
+                                        type: string
+                                    updated_at:
+                                        format: date-time
+                                        type: string
+                                type: object
+                    description: Upload status
+                "401":
+                    description: Unauthenticated
+                "404":
+                    description: Upload not found
+            security:
+                - JwtBearer: []
+                - JwtCookie: []
+            summary: Get a file upload status
+            tags:
+                - Images
+    /api/verify-email:
+        post:
+            description: Submit email and six-digit code, up to five attempts. Codes expire in ten minutes.
+            operationId: verifyEmail
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            properties:
+                                code:
+                                    pattern: ^[0-9]{6}$
+                                    type: string
+                                email:
+                                    format: email
+                                    type: string
+                            required:
+                                - email
+                                - code
+                            type: object
+                required: true
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                properties:
+                                    message:
+                                        type: string
+                                    success:
+                                        const: true
+                                required:
+                                    - success
+                                    - message
+                                type: object
+                    description: Operation completed
+                "400":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/MessageError'
+                    description: Invalid, expired or locked confirmation code
+                "500":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/MessageError'
+                    description: Database failure
+            security: []
+            summary: Confirm email with a six-digit code
+            tags:
+                - Authentication
+    /auth:
+        get:
+            description: Placeholder response only. No HTML page or extra business function is implemented.
+            operationId: placeholder_auth
+            parameters:
+                - description: Optional 1–64 ASCII letters, digits, underscore or dash. Invalid/missing values are replaced by a UUID, not rejected.
+                  in: header
+                  name: X-Request-ID
+                  required: false
+                  schema:
+                    maxLength: 64
+                    type: string
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            example:
+                                message: Authentication page
+                            schema:
+                                $ref: '#/components/schemas/Message'
+                    description: Placeholder JSON message only
+                    headers:
+                        X-Request-ID:
+                            description: Accepted or generated correlation identifier
+                            schema:
+                                type: string
+            security: []
+            summary: 'Placeholder: Authentication page'
+            tags:
+                - Service
+    /delete-image/{id}:
+        delete:
+            description: Queues durable physical deletion and hides metadata. Quota is released only after the original, thumbnail and staging objects have been deleted. Deletion retries indefinitely after storage errors.
+            operationId: deleteImageWeb
+            parameters:
+                - description: Image metadata ID in PostgreSQL, not a filename. No HTTP listing/ID lookup is implemented; use the documented local fixture/database query for tests.
+                  in: path
+                  name: id
+                  required: true
+                  schema:
+                    maximum: 4.294967295e+09
+                    minimum: 0
+                    type: integer
+                - description: Optional 1–64 ASCII letters, digits, underscore or dash. Invalid/missing values are replaced by a UUID, not rejected.
+                  in: header
+                  name: X-Request-ID
+                  required: false
+                  schema:
+                    maxLength: 64
+                    type: string
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/DeleteResponse'
+                    description: Deletion scheduled
+                    headers:
+                        X-Request-ID:
+                            description: Accepted or generated correlation identifier
+                            schema:
+                                type: string
+                "400":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/DeleteResponse'
+                    description: Invalid uint32 image ID
+                    headers:
+                        X-Request-ID:
+                            description: Accepted or generated correlation identifier
+                            schema:
+                                type: string
+                "401":
+                    $ref: '#/components/responses/JwtDeleteUnauthorized'
+                "404":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/DeleteResponse'
+                    description: No visible owned image, or lookup failed
+                    headers:
+                        X-Request-ID:
+                            description: Accepted or generated correlation identifier
+                            schema:
+                                type: string
+                "500":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/DeleteResponse'
+                    description: Metadata deletion failed
+                    headers:
+                        X-Request-ID:
+                            description: Accepted or generated correlation identifier
+                            schema:
+                                type: string
+            security:
+                - JwtBearer: []
+                - JwtCookie: []
+            summary: Delete one owned image asynchronously
+            tags:
+                - Images
+    /delete-images:
+        delete:
+            description: Queues durable physical deletion and hides metadata. Quota is released only after the original, thumbnail and staging objects have been deleted. Deletion retries indefinitely after storage errors.
+            operationId: deleteAllImagesWeb
+            parameters:
+                - description: Optional 1–64 ASCII letters, digits, underscore or dash. Invalid/missing values are replaced by a UUID, not rejected.
+                  in: header
+                  name: X-Request-ID
+                  required: false
+                  schema:
+                    maxLength: 64
+                    type: string
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/DeleteResponse'
+                    description: Deletion scheduled
+                    headers:
+                        X-Request-ID:
+                            description: Accepted or generated correlation identifier
+                            schema:
+                                type: string
+                "401":
+                    $ref: '#/components/responses/JwtDeleteUnauthorized'
+                "404":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/DeleteResponse'
+                    description: No visible images
+                    headers:
+                        X-Request-ID:
+                            description: Accepted or generated correlation identifier
+                            schema:
+                                type: string
+                "500":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/DeleteResponse'
+                    description: Image lookup/deletion failed
+                    headers:
+                        X-Request-ID:
+                            description: Accepted or generated correlation identifier
+                            schema:
+                                type: string
+            security:
+                - JwtBearer: []
+                - JwtCookie: []
+            summary: Delete all images of the current user
+            tags:
+                - Images
+    /home:
+        get:
+            description: Placeholder response only. No HTML page or extra business function is implemented.
+            operationId: placeholder_home
+            parameters:
+                - description: Optional 1–64 ASCII letters, digits, underscore or dash. Invalid/missing values are replaced by a UUID, not rejected.
+                  in: header
+                  name: X-Request-ID
+                  required: false
+                  schema:
+                    maxLength: 64
+                    type: string
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            example:
+                                message: Home page
+                            schema:
+                                $ref: '#/components/schemas/Message'
+                    description: Placeholder JSON message only
+                    headers:
+                        X-Request-ID:
+                            description: Accepted or generated correlation identifier
+                            schema:
+                                type: string
+                "401":
+                    $ref: '#/components/responses/JwtUnauthorized'
+            security:
+                - JwtBearer: []
+                - JwtCookie: []
+            summary: 'Placeholder: Home page'
+            tags:
+                - Service
+    /images/{filename}:
+        get:
+            description: Original bytes for a visible owned image; MIME type derives from filename extension.
+            operationId: readImage
+            parameters:
+                - description: Filename returned by upload (UUID plus extension), not the metadata ID.
+                  example: 00000000-0000-4000-8000-000000000001.jpg
+                  in: path
+                  name: filename
+                  required: true
+                  schema:
+                    minLength: 1
+                    type: string
+                - description: Optional 1–64 ASCII letters, digits, underscore or dash. Invalid/missing values are replaced by a UUID, not rejected.
+                  in: header
+                  name: X-Request-ID
+                  required: false
+                  schema:
+                    maxLength: 64
+                    type: string
+            responses:
+                "200":
+                    content:
+                        application/octet-stream:
+                            schema:
+                                format: binary
+                                type: string
+                        image/gif:
+                            schema:
+                                format: binary
+                                type: string
+                        image/jpeg:
+                            schema:
+                                format: binary
+                                type: string
+                        image/png:
+                            schema:
+                                format: binary
+                                type: string
+                    description: Decrypted binary bytes
+                    headers:
+                        X-Request-ID:
+                            description: Accepted or generated correlation identifier
+                            schema:
+                                type: string
+                "401":
+                    $ref: '#/components/responses/JwtUnauthorized'
+                "404":
+                    description: Empty response if not owned/not found, database lookup failed, or storage read/decryption failed.
+                    headers:
+                        X-Request-ID:
+                            description: Accepted or generated correlation identifier
+                            schema:
+                                type: string
+            security:
+                - JwtBearer: []
+                - JwtCookie: []
+            summary: Read decrypted original
+            tags:
+                - Images
+    /logout:
+        post:
+            description: Revokes the current JWT until it expires and clears the authentication cookie. Other sessions remain active. Authorization takes precedence over the cookie.
+            operationId: logout
+            parameters:
+                - description: Optional 1–64 ASCII letters, digits, underscore or dash. Invalid/missing values are replaced by a UUID, not rejected.
+                  in: header
+                  name: X-Request-ID
+                  required: false
+                  schema:
+                    maxLength: 64
+                    type: string
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            example:
+                                message: Logout successful
+                                success: true
+                            schema:
+                                $ref: '#/components/schemas/DeleteResponse'
+                    description: Cookie cleared
+                    headers:
+                        Set-Cookie:
+                            description: Expired auth_token cookie
+                            schema:
+                                type: string
+                        X-Request-ID:
+                            description: Accepted or generated correlation identifier
+                            schema:
+                                type: string
+                "401":
+                    $ref: '#/components/responses/JwtUnauthorized'
+            security:
+                - JwtBearer: []
+                - JwtCookie: []
+            summary: Clear the authentication cookie
+            tags:
+                - Authentication
+    /openapi.yml:
+        get:
+            description: Available only to authenticated administrators.
+            operationId: openApiSpec
+            responses:
+                "200":
+                    description: OpenAPI YAML
+                "401":
+                    $ref: '#/components/responses/JwtUnauthorized'
+                "403":
+                    description: Administrator rights required
+                "503":
+                    description: Authentication temporarily unavailable
+            security:
+                - JwtBearer: []
+                - JwtCookie: []
+            summary: Get the OpenAPI specification
+            tags:
+                - Service
+    /politics:
+        get:
+            description: Placeholder response only. No HTML page or extra business function is implemented.
+            operationId: placeholder_politics
+            parameters:
+                - description: Optional 1–64 ASCII letters, digits, underscore or dash. Invalid/missing values are replaced by a UUID, not rejected.
+                  in: header
+                  name: X-Request-ID
+                  required: false
+                  schema:
+                    maxLength: 64
+                    type: string
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            example:
+                                message: Privacy policy page
+                            schema:
+                                $ref: '#/components/schemas/Message'
+                    description: Placeholder JSON message only
+                    headers:
+                        X-Request-ID:
+                            description: Accepted or generated correlation identifier
+                            schema:
+                                type: string
+            security: []
+            summary: 'Placeholder: Privacy policy page'
+            tags:
+                - Service
+    /profile:
+        get:
+            operationId: profile
+            parameters:
+                - description: Optional 1–64 ASCII letters, digits, underscore or dash. Invalid/missing values are replaced by a UUID, not rejected.
+                  in: header
+                  name: X-Request-ID
+                  required: false
+                  schema:
+                    maxLength: 64
+                    type: string
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ProfileResponse'
+                    description: Current user
+                    headers:
+                        X-Request-ID:
+                            description: Accepted or generated correlation identifier
+                            schema:
+                                type: string
+                "401":
+                    $ref: '#/components/responses/JwtUnauthorized'
+                "500":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/MessageError'
+                    description: User could not be loaded for the JWT claims
+                    headers:
+                        X-Request-ID:
+                            description: Accepted or generated correlation identifier
+                            schema:
+                                type: string
+            security:
+                - JwtBearer: []
+                - JwtCookie: []
+            summary: Read current user profile
+            tags:
+                - Authentication
+    /thumbnails/{filename}:
+        get:
+            description: Owned thumbnail, fitted within 300×300, always JPEG.
+            operationId: readThumbnail
+            parameters:
+                - description: Filename returned by upload (UUID plus extension), not the metadata ID.
+                  example: 00000000-0000-4000-8000-000000000001.jpg
+                  in: path
+                  name: filename
+                  required: true
+                  schema:
+                    minLength: 1
+                    type: string
+                - description: Optional 1–64 ASCII letters, digits, underscore or dash. Invalid/missing values are replaced by a UUID, not rejected.
+                  in: header
+                  name: X-Request-ID
+                  required: false
+                  schema:
+                    maxLength: 64
+                    type: string
+            responses:
+                "200":
+                    content:
+                        image/jpeg:
+                            schema:
+                                format: binary
+                                type: string
+                    description: Decrypted binary bytes
+                    headers:
+                        X-Request-ID:
+                            description: Accepted or generated correlation identifier
+                            schema:
+                                type: string
+                "401":
+                    $ref: '#/components/responses/JwtUnauthorized'
+                "404":
+                    description: Empty response if not owned/not found, database lookup failed, or storage read/decryption failed.
+                    headers:
+                        X-Request-ID:
+                            description: Accepted or generated correlation identifier
+                            schema:
+                                type: string
+            security:
+                - JwtBearer: []
+                - JwtCookie: []
+            summary: Read decrypted JPEG thumbnail
+            tags:
+                - Images
+servers:
+    - description: Current server
+      url: /
+tags:
+    - description: Authentication endpoints
+      name: Authentication
+    - description: Images endpoints
+      name: Images
+    - description: Administration endpoints
+      name: Administration
+    - description: Service endpoints
+      name: Service

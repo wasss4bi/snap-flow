@@ -1,0 +1,19 @@
+meta {
+  name: Invalid JWT
+  type: http
+  seq: 19
+}
+
+get {
+  url: {{baseUrl}}/profile
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer invalid-example-jwt
+}
+
+tests {
+  test("HTTP 401", function () { expect(res.getStatus()).to.equal(401); });
+}

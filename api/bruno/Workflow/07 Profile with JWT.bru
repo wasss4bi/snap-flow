@@ -1,0 +1,21 @@
+meta {
+  name: Profile with JWT
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{baseUrl}}/profile
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{jwt}}
+}
+
+tests {
+  test("HTTP 200", function () { expect(res.getStatus()).to.equal(200); });
+  test("success", function () { expect(res.getBody().success).to.equal(true); });
+  test("owner", function(){expect(res.getBody().user.email).to.equal(bru.getEnvVar('email'));});
+}

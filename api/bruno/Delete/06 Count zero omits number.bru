@@ -1,0 +1,21 @@
+meta {
+  name: Count zero omits number
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/api/get-images-count
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{jwt}}
+}
+
+tests {
+  test("HTTP 200", function () { expect(res.getStatus()).to.equal(200); });
+  test("success", function () { expect(res.getBody().success).to.equal(true); });
+  test("zero count",function(){expect(res.getBody().images_count||0).to.equal(0);expect(res.getBody()).not.to.have.property('images_count');});
+}
